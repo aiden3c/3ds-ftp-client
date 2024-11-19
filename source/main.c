@@ -1,46 +1,89 @@
-/*
-	Hello World example made by Aurelio Mannara for libctru
-	This code was modified for the last time on: 12/12/2014 21:00 UTC+1
-*/
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+#include <malloc.h>
+#include <errno.h>
+#include <stdarg.h>
+#include <unistd.h>
+#include <ctype.h>
+
+
+#include <fcntl.h>
+
+#include <sys/types.h>
+#include <sys/socket.h>
+#include <netinet/in.h>
+#include <arpa/inet.h>
+#include <netdb.h>
+
+#include <mbedtls/net.h>
+#include <mbedtls/ssl.h>
+#include <mbedtls/entropy.h>
+#include <mbedtls/ctr_drbg.h>
+#include <mbedtls/debug.h>
+
+#include <curl/curl.h>
+
+#include <citro2d.h>
 
 #include <3ds.h>
-#include <stdio.h>
+
+#define TOP_SCREEN_WIDTH 400
+#define TOP_SCREEN_HEIGHT 240
+#define MAX_TEXT_SIZE 1024 * 16
+
+void drawText(int x, int y, int z, float scale, u32 color, char* text, int flags, C2D_Font font) {
+    C2D_Text drawText;
+    C2D_TextBuf dynamicBuffer = C2D_TextBufNew(MAX_TEXT_SIZE);
+    C2D_TextBufClear(dynamicBuffer);
+    C2D_TextFontParse( &drawText, font, dynamicBuffer, text );
+    C2D_TextOptimize( &drawText );
+
+    C2D_DrawText( &drawText, flags, x, y, z, scale, scale, color, TOP_SCREEN_WIDTH - 9.0 );
+
+    C2D_TextBufDelete(dynamicBuffer);
+}
 
 int main(int argc, char **argv)
 {
-	gfxInitDefault();
+    romfsInit();
+    cfguInit();
+    gfxInitDefault();
+    atexit(gfxExit);
+    C3D_Init(C3D_DEFAULT_CMDBUF_SIZE);
+    C2D_Init(C2D_DEFAULT_MAX_OBJECTS);
+    C2D_Prepare();
+    C3D_RenderTarget* top = C2D_CreateScreenTarget(GFX_TOP, GFX_LEFT);
 
-	//Initialize console on top screen. Using NULL as the second argument tells the console library to use the internal console structure as current one
-	consoleInit(GFX_TOP, NULL);
+    C3D_RenderTarget* bottom = C2D_CreateScreenTarget(GFX_BOTTOM, GFX_LEFT);
 
-	//Move the cursor to row 15 and column 19 and then prints "Hello World!"
-	//To move the cursor you have to print "\x1b[r;cH", where r and c are respectively
-	//the row and column where you want your cursor to move
-	//The top screen has 30 rows and 50 columns
-	//The bottom screen has 30 rows and 40 columns
-	printf("\x1b[16;20HHello World!");
+	touchPosition touch;
 
-	printf("\x1b[30;16HPress Start to exit.");
+	C2D_Font font = C2D_FontLoad("romfs:/ffbold.bcfnt");
+	u32 backgroundColor = C2D_Color32(0xF1, 0xEA, 0xA7, 0xFF);
+	u32 textColor  = C2D_Color32(0xFB, 0xFC, 0xFC, 0xFF);
 
-	// Main loop
 	while (aptMainLoop())
 	{
 		//Scan all the inputs. This should be done once for each frame
 		hidScanInput();
+		hidTouchRead( &touch );
+
+		C3D_FrameBegin(C3D_FRAME_SYNCDRAW);
+        C2D_TargetClear(top, backgroundColor);
+        C2D_SceneBegin(top);
+
+        char randomData[100];
+        snprintf(randomData, sizeof(randomData), "(%d, %d)", touch.px, touch.py);
+        drawText(6, 6, 1, 1, textColor, randomData, C2D_WithColor | C2D_WordWrap, font);
 
 		//hidKeysDown returns information about which buttons have been just pressed (and they weren't in the previous frame)
 		u32 kDown = hidKeysDown();
-
 		if (kDown & KEY_START) break; // break in order to return to hbmenu
 
-		// Flush and swap framebuffers
-		gfxFlushBuffers();
-		gfxSwapBuffers();
 
-		//Wait for VBlank
-		gspWaitForVBlank();
+		C3D_FrameEnd(0);
 	}
-
-	gfxExit();
-	return 0;
+	C2D_FontFree(font);
+	exit(0);
 }
