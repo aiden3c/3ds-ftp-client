@@ -37,6 +37,14 @@
 #define MAX_TEXT_SIZE 1024 * 16
 #define MAX_SPRITES 256 //arbitrary
 
+typedef void (*ButtonCallback)(touchPosition); //for callback structs
+
+enum Scene {
+    ROOT,
+    EDIT,
+    BOOK
+};
+
 typedef struct
 {
 	C2D_Sprite sprite;
@@ -48,12 +56,15 @@ typedef struct
 	int textOffsetY;
 	float textScale;
 	C2D_Font* font;
+    ButtonCallback callback;
 } UIButton;
 
 typedef struct
 {
     int rainbowDelay;
     int rainbowDelayDefault;
+    enum Scene scene;
+    touchPosition pressedCoords;
 } AppState;
 
 static C2D_SpriteSheet spriteSheet;
@@ -61,6 +72,18 @@ AppState mainState;
 C2D_ImageTint rainbowTint;
 C2D_ImageTint shadowTint;
 C2D_ImageTint disabledTint;
+
+void addressBookCallback(touchPosition _) {
+    exit(0);
+}
+
+void addressConnectCallback(touchPosition _) {
+    exit(0);
+}
+
+void buttonEditCallback(touchPosition _) {
+    exit(0);
+}
 
 void drawText(int x, int y, int z, float scale, u32 color, char* text, int flags, C2D_Font font) {
     C2D_Text drawText;
@@ -116,7 +139,9 @@ void drawButton(UIButton* button) {
     int distance = 4;
     bool needShadow = 1;
 
-    if(button->pressed == 0 ^ button->disabled == 0) { // Raise button for rendering to indicate pressability
+    if(button->pressed) { // Raise button for rendering to indicate pressability
+        needShadow = 0;
+    } else if (button->disabled) {
         needShadow = 0;
     }
 
@@ -173,6 +198,7 @@ int main(int argc, char **argv)
     // State initialization
     mainState.rainbowDelayDefault = 5;
     mainState.rainbowDelay = 5;
+    mainState.scene = 0; // root
 
     // Load graphics
 	spriteSheet = C2D_SpriteSheetLoad("romfs:/gfx/sprites.t3x");
@@ -189,7 +215,7 @@ int main(int argc, char **argv)
 	buttonMain.textOffsetX = 20;
 	buttonMain.textOffsetY = 0;
 	buttonMain.textScale = 2.2;
-
+    buttonMain.callback = addressConnectCallback;
 
 	UIButton buttonEdit;
 	buttonEdit.pressed = 0;
@@ -197,12 +223,32 @@ int main(int argc, char **argv)
 	buttonEdit.rainbow = 0;
 	buttonEdit.text = "Edit";
 	C2D_SpriteFromSheet(&buttonEdit.sprite, spriteSheet, 1);
-	buttonEdit.sprite.params.pos.x = 38;
+	buttonEdit.sprite.params.pos.x = 42;
 	buttonEdit.sprite.params.pos.y = 128;
 	buttonEdit.textOffsetX = 10;
 	buttonEdit.textOffsetY = 0;
 	buttonEdit.textScale = 2;
+    buttonEdit.callback = buttonEditCallback;
 
+    UIButton buttonAddressBook;
+	buttonAddressBook.pressed = 0;
+	buttonAddressBook.disabled = 0;
+	buttonAddressBook.rainbow = 0;
+	buttonAddressBook.text = "Book";
+	C2D_SpriteFromSheet(&buttonAddressBook.sprite, spriteSheet, 1);
+	buttonAddressBook.sprite.params.pos.x = 175;
+	buttonAddressBook.sprite.params.pos.y = 128;
+	buttonAddressBook.textOffsetX = 10;
+	buttonAddressBook.textOffsetY = 0;
+	buttonAddressBook.textScale = 2;
+    buttonEdit.callback = addressBookCallback;
+
+
+    UIButton* buttons[25]; //arbitrary
+    buttons[0] = &buttonMain;
+    buttons[1] = &buttonEdit;
+    buttons[2] = &buttonAddressBook;
+    int buttonCount = 3;
 
     C3D_Init(C3D_DEFAULT_CMDBUF_SIZE);
     C2D_Init(C2D_DEFAULT_MAX_OBJECTS);
@@ -216,6 +262,8 @@ int main(int argc, char **argv)
 	C2D_Font font = C2D_FontLoad("romfs:/ffbold.bcfnt");
 	buttonMain.font = &font;
     buttonEdit.font = &font;
+    buttonAddressBook.font = &font;
+    
 	u32 backgroundColor = C2D_Color32(0xF1, 0xEA, 0xA7, 0xFF);
 	u32 textColor  = C2D_Color32(0xFB, 0xFC, 0xFC, 0xFF);
 
@@ -224,6 +272,23 @@ int main(int argc, char **argv)
         // Pre-processing for frame
         hidScanInput();
         hidTouchRead( &touch );
+        if(!(touch.px == 0 && touch.py == 0)) {
+            mainState.pressedCoords = touch;
+        }
+        for (int i = 0; i < buttonCount; i++) {
+            if(buttons[i]->sprite.params.pos.x < mainState.pressedCoords.px && buttons[i]->sprite.params.pos.x + buttons[i]->sprite.params.pos.w > mainState.pressedCoords.px && buttons[i]->sprite.params.pos.y < mainState.pressedCoords.py && buttons[i]->sprite.params.pos.y + buttons[i]->sprite.params.pos.h > mainState.pressedCoords.py) {
+                    buttons[i]->pressed = 1;
+            } else {
+                buttons[i]->pressed = 0;
+            }
+        }
+        if(touch.px == 0 && touch.py == 0) {
+            for (int i = 0; i < buttonCount; i++) {
+                if(buttons[i]->pressed && buttons[i]->disabled == 0) {
+                    buttons[i]->callback(touch);
+                }
+            }
+        }
 
         u32 kDown = hidKeysDown();
 		if (kDown & KEY_START) break; // break in order to return to hbmenu
@@ -234,15 +299,16 @@ int main(int argc, char **argv)
         C2D_TargetClear(top, backgroundColor);
         C2D_SceneBegin(top);
         char randomData[100];
-        snprintf(randomData, sizeof(randomData), "(%d, %d)", touch.px, touch.py);
+        snprintf(randomData, sizeof(randomData), "(%d, %d)\n(%d, %d)", touch.px, touch.py, mainState.pressedCoords.px, mainState.pressedCoords.py);
         drawText(6, 6, 1, 1, textColor, randomData, C2D_WithColor | C2D_WordWrap, font);
 
 
         // Bottom Screen
         C2D_TargetClear(bottom, backgroundColor);
         C2D_SceneBegin(bottom);
-        drawButton(&buttonMain);
-        drawButton(&buttonEdit);
+        for (int i = 0; i < buttonCount; i++) {
+            drawButton(buttons[i]);
+        }
         updateRainbowTint(&rainbowTint, &mainState);
 
 		C3D_FrameEnd(0);
