@@ -191,6 +191,19 @@ int main(int argc, char **argv)
 	buttonMain.textScale = 2.2;
 
 
+	UIButton buttonEdit;
+	buttonEdit.pressed = 0;
+	buttonEdit.disabled = 0;
+	buttonEdit.rainbow = 0;
+	buttonEdit.text = "Edit";
+	C2D_SpriteFromSheet(&buttonEdit.sprite, spriteSheet, 1);
+	buttonEdit.sprite.params.pos.x = 38;
+	buttonEdit.sprite.params.pos.y = 128;
+	buttonEdit.textOffsetX = 10;
+	buttonEdit.textOffsetY = 0;
+	buttonEdit.textScale = 2;
+
+
     C3D_Init(C3D_DEFAULT_CMDBUF_SIZE);
     C2D_Init(C2D_DEFAULT_MAX_OBJECTS);
     C2D_Prepare();
@@ -202,6 +215,7 @@ int main(int argc, char **argv)
 
 	C2D_Font font = C2D_FontLoad("romfs:/ffbold.bcfnt");
 	buttonMain.font = &font;
+    buttonEdit.font = &font;
 	u32 backgroundColor = C2D_Color32(0xF1, 0xEA, 0xA7, 0xFF);
 	u32 textColor  = C2D_Color32(0xFB, 0xFC, 0xFC, 0xFF);
 
@@ -213,9 +227,6 @@ int main(int argc, char **argv)
 
         u32 kDown = hidKeysDown();
 		if (kDown & KEY_START) break; // break in order to return to hbmenu
-		if (kDown & KEY_A) {
-		  buttonMain.disabled = !buttonMain.disabled;
-		}
 
 
 		// Top Screen
@@ -231,6 +242,7 @@ int main(int argc, char **argv)
         C2D_TargetClear(bottom, backgroundColor);
         C2D_SceneBegin(bottom);
         drawButton(&buttonMain);
+        drawButton(&buttonEdit);
         updateRainbowTint(&rainbowTint, &mainState);
 
 		C3D_FrameEnd(0);
