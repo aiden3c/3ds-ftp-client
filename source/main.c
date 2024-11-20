@@ -29,6 +29,10 @@
 
 #include <3ds.h>
 
+#include <archive.h>
+#include <archive_entry.h>
+
+
 #define TOP_SCREEN_WIDTH 400
 #define TOP_SCREEN_HEIGHT 240
 #define BOTTOM_SCREEN_WIDTH 320
@@ -37,13 +41,28 @@
 #define MAX_TEXT_SIZE 1024 * 16
 #define MAX_SPRITES 256 //arbitrary
 
-typedef void (*ButtonCallback)(touchPosition); //for callback structs
+FS_Archive ArchiveSD;
 
 enum Scene {
     ROOT,
     EDIT,
     BOOK
 };
+
+typedef struct
+{
+    int rainbowDelay;
+    int rainbowDelayDefault;
+    enum Scene scene;
+    touchPosition pressedCoords;
+    u32 colors[128];
+    u32 backgroundColorBottom;
+    u32 backgroundColorTop;
+
+    u32 *fileSystemHandle;
+} AppState;
+
+typedef void (*ButtonCallback)(AppState*, touchPosition);
 
 typedef struct
 {
@@ -57,15 +76,8 @@ typedef struct
 	float textScale;
 	C2D_Font* font;
     ButtonCallback callback;
-} UIButton;
-
-typedef struct
-{
-    int rainbowDelay;
-    int rainbowDelayDefault;
     enum Scene scene;
-    touchPosition pressedCoords;
-} AppState;
+} UIButton;
 
 static C2D_SpriteSheet spriteSheet;
 AppState mainState;
@@ -73,16 +85,18 @@ C2D_ImageTint rainbowTint;
 C2D_ImageTint shadowTint;
 C2D_ImageTint disabledTint;
 
-void addressBookCallback(touchPosition _) {
+void addressBookCallback(AppState* mainState, touchPosition _) {
+    mainState->backgroundColorBottom = mainState->colors[1];
+    mainState->scene = BOOK;
+}
+
+void addressConnectCallback(AppState* mainState, touchPosition _) {
     exit(0);
 }
 
-void addressConnectCallback(touchPosition _) {
-    exit(0);
-}
-
-void buttonEditCallback(touchPosition _) {
-    exit(0);
+void buttonEditCallback(AppState* mainState, touchPosition _) {
+    mainState->backgroundColorBottom = mainState->colors[1];
+    mainState->scene = EDIT;
 }
 
 void drawText(int x, int y, int z, float scale, u32 color, char* text, int flags, C2D_Font font) {
@@ -114,8 +128,8 @@ void updateRainbowTint(C2D_ImageTint* tint, AppState* appState) {
 
     // Initialize the hue randomly on the first call
     if (hue < 0.0f) {
-        srand((unsigned int)time(NULL)); // Seed the random generator
-        hue = (float)rand() / RAND_MAX; // Random value between 0.0 and 1.0
+        srand((unsigned int)time(NULL));
+        hue = (float)rand() / RAND_MAX;
     }
 
     if (appState->rainbowDelay > 0) {
@@ -187,6 +201,14 @@ void initTint()
     }
 }
 
+int initSD()
+{
+    Result res;
+    if(R_FAILED(res = FSUSER_OpenArchive(&ArchiveSD, ARCHIVE_SDMC, fsMakePath(PATH_EMPTY, "")))) return res;
+
+    return 0;
+}
+
 int main(int argc, char **argv)
 {
     romfsInit();
@@ -195,11 +217,24 @@ int main(int argc, char **argv)
     initTint();
     atexit(gfxExit);
 
+
+    fsInit();
+    mainState.fileSystemHandle = fsGetSessionHandle();
+    
+
+    mainState.colors[0] = C2D_Color32(0xF1, 0xEA, 0xA7, 0xFF); // Background
+    mainState.colors[1] = C2D_Color32(0xC4, 0xBC, 0x6A, 0xFF); // Background Dark
+    mainState.colors[2] = C2D_Color32(0xFB, 0xFC, 0xFC, 0xFF); // Text (Iced)
+
+
     // State initialization
     mainState.rainbowDelayDefault = 5;
     mainState.rainbowDelay = 5;
-    mainState.scene = 0; // root
+    mainState.scene = ROOT;
+    mainState.backgroundColorTop = mainState.colors[0];
+    mainState.backgroundColorBottom = mainState.colors[0];
 
+    // Don't worry I'm moving this and other things to another file to import
     // Load graphics
 	spriteSheet = C2D_SpriteSheetLoad("romfs:/gfx/sprites.t3x");
 	if (!spriteSheet) svcBreak(USERBREAK_PANIC);
@@ -216,6 +251,7 @@ int main(int argc, char **argv)
 	buttonMain.textOffsetY = 0;
 	buttonMain.textScale = 2.2;
     buttonMain.callback = addressConnectCallback;
+    buttonMain.scene = 0;
 
 	UIButton buttonEdit;
 	buttonEdit.pressed = 0;
@@ -229,6 +265,7 @@ int main(int argc, char **argv)
 	buttonEdit.textOffsetY = 0;
 	buttonEdit.textScale = 2;
     buttonEdit.callback = buttonEditCallback;
+    buttonEdit.scene = 0;
 
     UIButton buttonAddressBook;
 	buttonAddressBook.pressed = 0;
@@ -241,7 +278,8 @@ int main(int argc, char **argv)
 	buttonAddressBook.textOffsetX = 10;
 	buttonAddressBook.textOffsetY = 0;
 	buttonAddressBook.textScale = 2;
-    buttonEdit.callback = addressBookCallback;
+    buttonAddressBook.callback = addressBookCallback;
+    buttonAddressBook.scene = 0;
 
 
     UIButton* buttons[25]; //arbitrary
@@ -264,14 +302,14 @@ int main(int argc, char **argv)
     buttonEdit.font = &font;
     buttonAddressBook.font = &font;
     
-	u32 backgroundColor = C2D_Color32(0xF1, 0xEA, 0xA7, 0xFF);
-	u32 textColor  = C2D_Color32(0xFB, 0xFC, 0xFC, 0xFF);
 
 	while (aptMainLoop())
 	{
         // Pre-processing for frame
         hidScanInput();
         hidTouchRead( &touch );
+
+        // All of this runs the button callbacks if they were selected when released
         if(!(touch.px == 0 && touch.py == 0)) {
             mainState.pressedCoords = touch;
         }
@@ -285,30 +323,41 @@ int main(int argc, char **argv)
         if(touch.px == 0 && touch.py == 0) {
             for (int i = 0; i < buttonCount; i++) {
                 if(buttons[i]->pressed && buttons[i]->disabled == 0) {
-                    buttons[i]->callback(touch);
+                    buttons[i]->callback(&mainState, touch);
+                    mainState.pressedCoords = touch;
                 }
             }
         }
 
+
+        // Keyboard inputs
         u32 kDown = hidKeysDown();
 		if (kDown & KEY_START) break; // break in order to return to hbmenu
+        if (kDown & KEY_A) {
+            mainState.scene = 0;
+            mainState.backgroundColorBottom = mainState.colors[0];
+        }
 
 
 		// Top Screen
 		C3D_FrameBegin(C3D_FRAME_SYNCDRAW);
-        C2D_TargetClear(top, backgroundColor);
+        C2D_TargetClear(top, mainState.backgroundColorTop);
         C2D_SceneBegin(top);
         char randomData[100];
-        snprintf(randomData, sizeof(randomData), "(%d, %d)\n(%d, %d)", touch.px, touch.py, mainState.pressedCoords.px, mainState.pressedCoords.py);
-        drawText(6, 6, 1, 1, textColor, randomData, C2D_WithColor | C2D_WordWrap, font);
+        snprintf(randomData, sizeof(randomData), "(%d, %d)\n(%d, %d)\n%d", touch.px, touch.py, mainState.pressedCoords.px, mainState.pressedCoords.py, mainState.fileSystemHandle);
+        drawText(6, 6, 1, 1, mainState.colors[2], randomData, C2D_WithColor | C2D_WordWrap, font);
 
 
         // Bottom Screen
-        C2D_TargetClear(bottom, backgroundColor);
+        C2D_TargetClear(bottom, mainState.backgroundColorBottom);
         C2D_SceneBegin(bottom);
         for (int i = 0; i < buttonCount; i++) {
-            drawButton(buttons[i]);
+            if(mainState.scene == buttons[i]->scene) {
+                drawButton(buttons[i]);
+            }
         }
+
+        // Ooh pretty colors
         updateRainbowTint(&rainbowTint, &mainState);
 
 		C3D_FrameEnd(0);
