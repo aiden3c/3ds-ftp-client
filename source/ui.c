@@ -1,4 +1,5 @@
 #include "ui.h"
+#include "fs.h"
 #include <stdlib.h>
 #include <math.h>
 #include <time.h>
@@ -16,11 +17,35 @@ C2D_ImageTint shadowTint;
 C2D_ImageTint disabledTint;
 C2D_SpriteSheet spriteSheet;
 
+void getKeyboardInput(char* output, char* prompt, char* existing, int size) {
+    bool in_keyboard = true;
+    static SwkbdState swkbd;
+    char keyboardBuffer[size];
+    memset(keyboardBuffer, 0, sizeof keyboardBuffer);
+    SwkbdButton button = SWKBD_BUTTON_NONE;
+    static SwkbdStatusData swkbdStatus;
+    swkbdInit(&swkbd, SWKBD_TYPE_NORMAL, 2, -1);
+    swkbdSetFeatures(&swkbd, SWKBD_MULTILINE);
+    swkbdSetInitialText(&swkbd, existing);
+    swkbdSetHintText(&swkbd, prompt);
+    static bool reload = false;
+    swkbdSetStatusData(&swkbd, &swkbdStatus, reload, true);
+    reload = true;
+    button = swkbdInputText(&swkbd, keyboardBuffer, sizeof(keyboardBuffer));
+
+    if(in_keyboard) {
+        if(button != SWKBD_BUTTON_NONE) {
+            memset(output, 0, size);
+            memcpy( output, keyboardBuffer, size );
+        }
+    }
+    return;
+}
+
 void addressBookCallback(AppState* mainState, touchPosition _) {
     mainState->backgroundColorBottom = mainState->colors[1];
     mainState->scene = BOOK;
-    mainState->addressBookPage = 0;
-    mainState->buttons[5].disabled = 1;
+    mainState->buttons[5].disabled = (mainState->addressBookPage == 0);
 }
 
 void addressConnectCallback(AppState* mainState, touchPosition _) {
@@ -45,24 +70,35 @@ void setAddressCallback(AppState* mainState, touchPosition touch) {
 
 void pageUp(AppState *mainState, touchPosition _) {
     mainState->addressBookPage += 1;
+    mainState->buttons[6].disabled = (mainState->addressBookPage >= 64);
     mainState->buttons[5].disabled = 0;
-    if(mainState->addressBookPage >= 64) {
-        mainState->buttons[6].disabled = 1;
-    }
 }
 void pageDown(AppState *mainState, touchPosition _) {
     mainState->addressBookPage -= 1;
+    mainState->buttons[5].disabled = (mainState->addressBookPage == 0);
     mainState->buttons[6].disabled = 0;
-    if(mainState->addressBookPage == 0) {
-        mainState->buttons[5].disabled = 1;
-    }
+}
+
+void editName(AppState *mainState, touchPosition _) {
+    getKeyboardInput(mainState->addressBook.data[mainState->currentAddress].name, "Enter a name for the entry!", mainState->addressBook.data[mainState->currentAddress].name, sizeof(mainState->addressBook.data[mainState->currentAddress].name));
+    saveAddressBook(&mainState->addressBook);
+}
+
+void editAddress(AppState *mainState, touchPosition _) {
+    getKeyboardInput(mainState->addressBook.data[mainState->currentAddress].address, "Enter the address for the entry!", mainState->addressBook.data[mainState->currentAddress].address, sizeof(mainState->addressBook.data[mainState->currentAddress].address));
+    saveAddressBook(&mainState->addressBook);
+}
+
+void editPort(AppState *mainState, touchPosition _) {
+    getKeyboardInput(mainState->addressBook.data[mainState->currentAddress].port, "Enter the address for the entry!", mainState->addressBook.data[mainState->currentAddress].port, sizeof(mainState->addressBook.data[mainState->currentAddress].port));
+    saveAddressBook(&mainState->addressBook);
 }
 
 UIButton* initButtons(int* buttonCount) {
    	spriteSheet = C2D_SpriteSheetLoad("romfs:/gfx/sprites.t3x");
 	if (!spriteSheet) svcBreak(USERBREAK_PANIC);
 
-    int count = 7; // I don't like this
+    int count = 10; // I don't like this
     UIButton* buttons = malloc(sizeof(UIButton) * count);
 
     buttons[0].pressed = 0;
@@ -169,8 +205,63 @@ UIButton* initButtons(int* buttonCount) {
     forwardButton.callback = pageUp;
     forwardButton.scene = BOOK;
 
+
+    // Address Edit Page
+    UIButton editNameButton;
+    editNameButton.pressed = 0;
+    editNameButton.disabled = 0;
+    editNameButton.rainbow = 0;
+    editNameButton.hideShadow = 1;
+    editNameButton.text = "Name:";
+    editNameButton.subtext = "";
+    C2D_SpriteFromSheet(&editNameButton.sprite, spriteSheet, 4);
+    editNameButton.sprite.params.pos.x = 31;
+    editNameButton.sprite.params.pos.y = 10;
+    editNameButton.textOffsetX = 6;
+    editNameButton.textOffsetY = 0;
+    editNameButton.textScale = 1;
+    editNameButton.callback = editName;
+    editNameButton.scene = EDIT;
+
+    UIButton editAddressButton;
+    editAddressButton.pressed = 0;
+    editAddressButton.disabled = 0;
+    editAddressButton.rainbow = 0;
+    editAddressButton.hideShadow = 1;
+    editAddressButton.text = "Address:";
+    editAddressButton.subtext = "";
+    C2D_SpriteFromSheet(&editAddressButton.sprite, spriteSheet, 4);
+    editAddressButton.sprite.params.pos.x = 31;
+    editAddressButton.sprite.params.pos.y = 70;
+    editAddressButton.textOffsetX = 6;
+    editAddressButton.textOffsetY = 0;
+    editAddressButton.textScale = 1;
+    editAddressButton.callback = editAddress;
+    editAddressButton.scene = EDIT;
+
+    UIButton editPortButton;
+    editPortButton.pressed = 0;
+    editPortButton.disabled = 0;
+    editPortButton.rainbow = 0;
+    editPortButton.hideShadow = 1;
+    editPortButton.text = "Port:";
+    editPortButton.subtext = "";
+    C2D_SpriteFromSheet(&editPortButton.sprite, spriteSheet, 4);
+    editPortButton.sprite.params.pos.x = 31;
+    editPortButton.sprite.params.pos.y = 130;
+    editPortButton.textOffsetX = 6;
+    editPortButton.textOffsetY = 0;
+    editPortButton.textScale = 1;
+    editPortButton.callback = editPort;
+    editPortButton.scene = EDIT;
+
+
     buttons[5] = backButton;
     buttons[6] = forwardButton;
+    buttons[7] = editNameButton;
+    buttons[8] = editAddressButton;
+    buttons[9] = editPortButton;
+
 
 
     *buttonCount = count;
@@ -268,7 +359,7 @@ void drawButton(UIButton* button) {
     C2D_TextOptimize(&drawText);
     C2D_DrawText(&drawText, C2D_WithColor,
                  button->sprite.params.pos.x + button->textOffsetX,
-                 button->sprite.params.pos.y + button->textOffsetY + 40,
+                 button->sprite.params.pos.y + button->textOffsetY + 35,
                  0, 0.7, 0.7, C2D_Color32(0xFB, 0xFC, 0xFC, 0xFF));
     C2D_TextBufDelete(textBuffer);
 

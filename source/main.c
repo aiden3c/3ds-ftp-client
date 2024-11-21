@@ -144,18 +144,15 @@ int main(int argc, char **argv)
         // Keyboard inputs
         u32 kDown = hidKeysDown();
 		if (kDown & KEY_START) break; // break in order to return to hbmenu
-        if (kDown & KEY_A)
+        if (kDown & KEY_B)
         {
             mainState.scene = 0;
             mainState.backgroundColorBottom = mainState.colors[0];
         }
-        if (kDown & KEY_B)
-        {
-            addDummyEntry(&mainState);
-            saveAddressBook(&mainState.addressBook);
-            mainState.message = mainState.addressBook.size;
-        }
 
+        // Validation
+        AddressBookEntry* entry = &mainState.addressBook.data[mainState.currentAddress];
+        mainState.buttons[0].disabled = !(entry->name[0] != '\0' && entry->address[0] != '\0' && entry->port[0] != '\0');
 
 		// Top Screen
 		C3D_FrameBegin(C3D_FRAME_SYNCDRAW);
@@ -210,6 +207,17 @@ int main(int argc, char **argv)
             volatile int page_size = sizeof(page);
             snprintf(page, page_size, "%d", mainState.addressBookPage + 1);
             drawText(155, 206, 1, 1, mainState.colors[3], page, C2D_WithColor | C2D_WordWrap, font);
+        }
+        else if(mainState.scene == EDIT)
+        {
+            UIButton* editNameButton = &mainState.buttons[7];
+            UIButton* editAddressButton = &mainState.buttons[8];
+            UIButton* editPortButton = &mainState.buttons[9];
+
+            editNameButton->subtext = mainState.addressBook.data[mainState.currentAddress].name;
+            editAddressButton->subtext = mainState.addressBook.data[mainState.currentAddress].address;
+            editPortButton->subtext = mainState.addressBook.data[mainState.currentAddress].port;
+            drawText(50, 206, 1, 1, mainState.colors[3], "Press B to go back.", C2D_WithColor | C2D_WordWrap, font);
         }
 
         // Ooh pretty colors

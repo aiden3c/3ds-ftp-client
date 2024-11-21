@@ -67,6 +67,7 @@ void updateRainbowTint(C2D_ImageTint* tint, AppState* appState);
 void drawButton(UIButton* button);
 void drawText(int x, int y, int z, float scale, u32 color, char* text, int flags, C2D_Font font);
 UIButton* initButtons(int* buttonCount);
+void getKeyboardInput(char* output, char* prompt, char* existing, int size);
 
 // Callback functions
 void addressBookCallback(AppState* mainState, touchPosition touch);
