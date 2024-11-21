@@ -3,42 +3,61 @@
 
 
 FS_Archive sdmcArchive;
+AddressBook addressBook;
+
+Result createFile(FS_Archive archive, FS_Path path, u64 fileSize) {
+    return FSUSER_CreateFile(archive, path, 0, fileSize);
+}
 
 void initSD() {
-    FSUSER_OpenArchive(&sdmcArchive, ARCHIVE_SDMC, fsMakePath(PATH_EMPTY, ""));
+    Result res;
+    if(R_SUCCEEDED(FSUSER_OpenArchive(&sdmcArchive, ARCHIVE_SDMC, fsMakePath(PATH_EMPTY, "")))){
+        res = FSUSER_CreateDirectory(sdmcArchive, fsMakePath(PATH_ASCII, "/3ds/ftp-client"), 0);
+        //if((u32)res == 0xC82044BE) // exists
+        //    res = 0;
+    } else {
+        exit(0); // just kill the program if no SD card for now
+    }
+
+    Handle addressHandle;
+    res = FSUSER_OpenFile(&addressHandle, ARCHIVE_SDMC, fsMakePath(PATH_ASCII, "/3ds/ftp-client/addressbook.bin"), FS_OPEN_READ, 0);
+    if(R_FAILED(res)) {
+        if(R_SUMMARY(res) == RS_NOTFOUND) {
+            res = createFile(sdmcArchive, fsMakePath(PATH_ASCII, "/3ds/ftp-client/addressbook.bin"), (u32)sizeof(AddressBook));
+            if (R_FAILED(res)) {
+                exit(0);
+            }
+        }
+    }
+
+}
+
+void exitSD() {
+    FSUSER_CloseArchive(sdmcArchive);
 }
 
 char* utfToAscii(const u16* utf16String) {
-    // Calculate the length of the UTF-16 string
     int utf16Length = 0;
     while (utf16String[utf16Length] != 0) {
         utf16Length++;
     }
-
-    // Allocate memory for the ASCII string
     char* asciiString = (char*)malloc(utf16Length + 1);
     if (asciiString == NULL) {
-        return NULL; // Return NULL on allocation failure
+        return NULL;
     }
-
-    // Convert UTF-16 to ASCII
     for (int i = 0; i < utf16Length; i++) {
-        // Check if the UTF-16 character is in the ASCII range
         if (utf16String[i] <= 0x7F) {
             asciiString[i] = (char)utf16String[i];
         } else {
-            // Replace non-ASCII characters with a placeholder
             asciiString[i] = '?';
         }
     }
-    asciiString[utf16Length] = '\0'; // Null-terminate the ASCII string
-
+    asciiString[utf16Length] = '\0';
     return asciiString;
 }
 
-char** listSD(char* pathooh, int* count) {
+char** listSD(char* path, int* count) {
     FS_DirectoryEntry entry;
-    const char *path = "/";
     Handle dirHandle;
     FS_Path dirPath = fsMakePath(PATH_ASCII, path);
 
@@ -47,14 +66,11 @@ char** listSD(char* pathooh, int* count) {
     static char* names[1024];
     for (int i = 0;;i++){
 
-            //Reset entries var
             entriesRead=0;
 
-            //Read the next item in the directory
             FSDIR_Read(dirHandle, &entriesRead, 1, (FS_DirectoryEntry*)&entry);
 
             names[i] = utfToAscii(entry.name);
-            //If there is a next item
             if (entriesRead){}else {
                 *count = i;
                 break;

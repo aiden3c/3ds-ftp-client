@@ -25,8 +25,9 @@ struct AppState {
     u32 backgroundColorBottom;
     u32 backgroundColorTop;
     u32 *fileSystemHandle;
-    char **nameList;
+    char **fileList;
     int fileCount;
+    int message;
 };
 
 // UIButton definition

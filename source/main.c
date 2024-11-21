@@ -77,7 +77,7 @@ int main(int argc, char **argv)
     mainState.backgroundColorTop = mainState.colors[0];
     mainState.backgroundColorBottom = mainState.colors[0];
 
-    mainState.nameList = listSD("/", &mainState.fileCount);
+    mainState.fileList = listSD("/", &mainState.fileCount);
 
     C3D_Init(C3D_DEFAULT_CMDBUF_SIZE);
     C2D_Init(C2D_DEFAULT_MAX_OBJECTS);
@@ -133,12 +133,13 @@ int main(int argc, char **argv)
 		C3D_FrameBegin(C3D_FRAME_SYNCDRAW);
         C2D_TargetClear(top, mainState.backgroundColorTop);
         C2D_SceneBegin(top);
+        mainState.message = createFile(sdmcArchive, fsMakePath(PATH_ASCII, "/3ds/ftp-client/addressbook.bin"), (u32)sizeof(addressBook));
         char randomData[100];
-        //snprintf(randomData, sizeof(randomData), "(%d, %d)\n(%d, %d)\n%d", touch.px, touch.py, mainState.pressedCoords.px, mainState.pressedCoords.py, mainState.fileCount);
-        //drawText(6, 6, 1, 1, mainState.colors[2], randomData, C2D_WithColor | C2D_WordWrap, font);
-        for (int i = 0; i < mainState.fileCount; i++) {
-            drawText(6, (i + 10) * 6, 1, 1, mainState.colors[2], mainState.nameList[i], C2D_WithColor | C2D_WordWrap, font);
-        }
+        snprintf(randomData, sizeof(randomData), "%x", mainState.message);
+        drawText(6, 6, 1, 1, mainState.colors[2], randomData, C2D_WithColor | C2D_WordWrap, font);
+        //for (int i = 0; i < mainState.fileCount; i++) {
+        //    drawText(6, (i + 10) * 6, 1, 1, mainState.colors[2], mainState.fileList[i], C2D_WithColor | C2D_WordWrap, font);
+        //}
 
 
         // Bottom Screen
@@ -156,5 +157,6 @@ int main(int argc, char **argv)
 		C3D_FrameEnd(0);
 	}
 	C2D_FontFree(font);
+	exitSD();
 	exit(0);
 }
