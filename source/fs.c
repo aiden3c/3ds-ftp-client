@@ -10,25 +10,30 @@ Result createFile(FS_Archive archive, FS_Path path, u64 fileSize) {
 }
 
 void initSD() {
-    Result res;
+
+    // Make sure we have our own folder
     if(R_SUCCEEDED(FSUSER_OpenArchive(&sdmcArchive, ARCHIVE_SDMC, fsMakePath(PATH_EMPTY, "")))){
-        res = FSUSER_CreateDirectory(sdmcArchive, fsMakePath(PATH_ASCII, "/3ds/ftp-client"), 0);
-        //if((u32)res == 0xC82044BE) // exists
+        FSUSER_CreateDirectory(sdmcArchive, fsMakePath(PATH_ASCII, "/3ds/ftp-client"), 0);
+        //
         //    res = 0;
     } else {
         exit(0); // just kill the program if no SD card for now
     }
 
+    // Make sure we have an address book saved
+    Result res;
     Handle addressHandle;
     res = FSUSER_OpenFile(&addressHandle, ARCHIVE_SDMC, fsMakePath(PATH_ASCII, "/3ds/ftp-client/addressbook.bin"), FS_OPEN_READ, 0);
     if(R_FAILED(res)) {
         if(R_SUMMARY(res) == RS_NOTFOUND) {
-            res = createFile(sdmcArchive, fsMakePath(PATH_ASCII, "/3ds/ftp-client/addressbook.bin"), (u32)sizeof(AddressBook));
-            if (R_FAILED(res)) {
-                exit(0);
-            }
+            createFile(sdmcArchive, fsMakePath(PATH_ASCII, "/3ds/ftp-client/addressbook.bin"), (u32)sizeof(AddressBook));
         }
     }
+
+    // Load the address book
+
+
+    FSFILE_Close(addressHandle);
 
 }
 
