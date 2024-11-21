@@ -17,7 +17,7 @@ struct File {
 struct AddressBookEntry {
     char name[64]; // arbitrary
     char address[128]; // arbitrary
-    char port[5];
+    char port[6]; // Port size + delimeter
 };
 
 struct AddressBook {
@@ -25,9 +25,12 @@ struct AddressBook {
 };
 
 // Function delcarations
-void initSD(void);
+Result initSD(void);
 void exitSD(void);
 char** listSD(char* path, int* length);
 Result createFile(FS_Archive archive, FS_Path path, u64 fileSize);
+Result readAddressBook(AddressBook *book);
+Result saveAddressBook(AddressBook *book);
+size_t countBookEntries(const AddressBook* book);
 
 #endif // FS_H

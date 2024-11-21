@@ -51,6 +51,20 @@ void initTint()
     }
 }
 
+void addDummyEntry(AppState *mainState, int index) {
+    // Set name
+    strncpy(mainState->addressBook.data[index].name, "Test", sizeof(mainState->addressBook.data[index].name) - 1);
+    mainState->addressBook.data[index].name[sizeof(mainState->addressBook.data[index].name) - 1] = '\0';
+
+    // Set address
+    strncpy(mainState->addressBook.data[index].address, "192.168.0.110", sizeof(mainState->addressBook.data[index].address) - 1);
+    mainState->addressBook.data[index].address[sizeof(mainState->addressBook.data[index].address) - 1] = '\0';
+
+    // Set port
+    strncpy(mainState->addressBook.data[index].port, "5000", sizeof(mainState->addressBook.data[index].port) - 1);
+    mainState->addressBook.data[index].port[sizeof(mainState->addressBook.data[index].port) - 1] = '\0';
+}
+
 int main(int argc, char **argv)
 {
     romfsInit();
@@ -60,14 +74,14 @@ int main(int argc, char **argv)
     atexit(gfxExit);
 
     initSD();
-    mainState.fileSystemHandle = fsGetSessionHandle();
 
     int buttonCount;
     UIButton* buttons = initButtons(&buttonCount);
 
     mainState.colors[0] = C2D_Color32(0xF1, 0xEA, 0xA7, 0xFF); // Background
     mainState.colors[1] = C2D_Color32(0xC4, 0xBC, 0x6A, 0xFF); // Background Dark
-    mainState.colors[2] = C2D_Color32(0xFB, 0xFC, 0xFC, 0xFF); // Text (Iced)
+    mainState.colors[2] = C2D_Color32(0xFB, 0xFC, 0xFC, 0xFF); // Light Text (Iced)
+    mainState.colors[3] = C2D_Color32(0x64, 0x00, 0x75, 0xFF); // Dark Text (Plum?)
 
 
     // State initialization
@@ -77,7 +91,11 @@ int main(int argc, char **argv)
     mainState.backgroundColorTop = mainState.colors[0];
     mainState.backgroundColorBottom = mainState.colors[0];
 
+    //mainState.message = saveAddressBook(&mainState.addressBook);
+    // Load saved data
     mainState.fileList = listSD("/", &mainState.fileCount);
+    readAddressBook(&mainState.addressBook);
+    mainState.message = countBookEntries(&mainState.addressBook);
 
     C3D_Init(C3D_DEFAULT_CMDBUF_SIZE);
     C2D_Init(C2D_DEFAULT_MAX_OBJECTS);
@@ -92,6 +110,8 @@ int main(int argc, char **argv)
 	for (int i = 0; i < buttonCount; i++) {
 	   buttons[i].font = &font;
 	}
+
+    int testCount = 1;
 
 	while (aptMainLoop())
 	{
@@ -127,16 +147,20 @@ int main(int argc, char **argv)
             mainState.scene = 0;
             mainState.backgroundColorBottom = mainState.colors[0];
         }
+        if (kDown & KEY_B) {
+            addDummyEntry(&mainState, testCount++);
+            mainState.message = countBookEntries(&mainState.addressBook);
+            saveAddressBook(&mainState.addressBook);
+        }
 
 
 		// Top Screen
 		C3D_FrameBegin(C3D_FRAME_SYNCDRAW);
         C2D_TargetClear(top, mainState.backgroundColorTop);
         C2D_SceneBegin(top);
-        mainState.message = createFile(sdmcArchive, fsMakePath(PATH_ASCII, "/3ds/ftp-client/addressbook.bin"), (u32)sizeof(addressBook));
         char randomData[100];
-        snprintf(randomData, sizeof(randomData), "%x", mainState.message);
-        drawText(6, 6, 1, 1, mainState.colors[2], randomData, C2D_WithColor | C2D_WordWrap, font);
+        snprintf(randomData, sizeof(randomData), "%s", mainState.addressBook.data[3].name);
+        drawText(6, 6, 1, 1, mainState.colors[3], randomData, C2D_WithColor | C2D_WordWrap, font);
         //for (int i = 0; i < mainState.fileCount; i++) {
         //    drawText(6, (i + 10) * 6, 1, 1, mainState.colors[2], mainState.fileList[i], C2D_WithColor | C2D_WordWrap, font);
         //}

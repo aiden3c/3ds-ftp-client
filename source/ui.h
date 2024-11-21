@@ -3,6 +3,7 @@
 
 #include <3ds.h>
 #include <citro2d.h>
+#include "fs.h"
 
 // Forward declare AppState and UIButton
 typedef struct AppState AppState;
@@ -15,7 +16,7 @@ enum Scene {
     BOOK
 };
 
-// AppState definition
+// AppState definition (this really shouldn't be here in ui)
 struct AppState {
     int rainbowDelay;
     int rainbowDelayDefault;
@@ -28,6 +29,8 @@ struct AppState {
     char **fileList;
     int fileCount;
     int message;
+    char* status;
+    AddressBook addressBook;
 };
 
 // UIButton definition
