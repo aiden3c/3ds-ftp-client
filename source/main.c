@@ -51,7 +51,9 @@ void initTint()
     }
 }
 
-void addDummyEntry(AppState *mainState, int index) {
+void addDummyEntry(AppState *mainState)
+{
+    int index = mainState->addressBook.size;
     // Set name
     strncpy(mainState->addressBook.data[index].name, "Test", sizeof(mainState->addressBook.data[index].name) - 1);
     mainState->addressBook.data[index].name[sizeof(mainState->addressBook.data[index].name) - 1] = '\0';
@@ -76,7 +78,7 @@ int main(int argc, char **argv)
     initSD();
 
     int buttonCount;
-    UIButton* buttons = initButtons(&buttonCount);
+    mainState.buttons = initButtons(&buttonCount);
 
     mainState.colors[0] = C2D_Color32(0xF1, 0xEA, 0xA7, 0xFF); // Background
     mainState.colors[1] = C2D_Color32(0xC4, 0xBC, 0x6A, 0xFF); // Background Dark
@@ -95,7 +97,7 @@ int main(int argc, char **argv)
     // Load saved data
     mainState.fileList = listSD("/", &mainState.fileCount);
     readAddressBook(&mainState.addressBook);
-    mainState.message = countBookEntries(&mainState.addressBook);
+    mainState.message = mainState.addressBook.size;
 
     C3D_Init(C3D_DEFAULT_CMDBUF_SIZE);
     C2D_Init(C2D_DEFAULT_MAX_OBJECTS);
@@ -108,10 +110,8 @@ int main(int argc, char **argv)
 
 	C2D_Font font = C2D_FontLoad("romfs:/ffbold.bcfnt");
 	for (int i = 0; i < buttonCount; i++) {
-	   buttons[i].font = &font;
+	   mainState.buttons[i].font = &font;
 	}
-
-    int testCount = 1;
 
 	while (aptMainLoop())
 	{
@@ -124,17 +124,18 @@ int main(int argc, char **argv)
             mainState.pressedCoords = touch;
         }
         for (int i = 0; i < buttonCount; i++) {
-            if(buttons[i].sprite.params.pos.x < mainState.pressedCoords.px && buttons[i].sprite.params.pos.x + buttons[i].sprite.params.pos.w > mainState.pressedCoords.px && buttons[i].sprite.params.pos.y < mainState.pressedCoords.py && buttons[i].sprite.params.pos.y + buttons[i].sprite.params.pos.h > mainState.pressedCoords.py) {
-                    buttons[i].pressed = 1;
+            if(mainState.buttons[i].sprite.params.pos.x < mainState.pressedCoords.px && mainState.buttons[i].sprite.params.pos.x + mainState.buttons[i].sprite.params.pos.w > mainState.pressedCoords.px && mainState.buttons[i].sprite.params.pos.y < mainState.pressedCoords.py && mainState.buttons[i].sprite.params.pos.y + mainState.buttons[i].sprite.params.pos.h > mainState.pressedCoords.py) {
+                    mainState.buttons[i].pressed = 1;
             } else {
-                buttons[i].pressed = 0;
+                mainState.buttons[i].pressed = 0;
             }
         }
         if(touch.px == 0 && touch.py == 0) {
             for (int i = 0; i < buttonCount; i++) {
-                if(buttons[i].pressed && buttons[i].disabled == 0) {
-                    buttons[i].callback(&mainState, touch);
+                if(mainState.buttons[i].pressed && mainState.buttons[i].disabled == 0 && mainState.buttons[i].scene == mainState.scene) {
+                    mainState.buttons[i].callback(&mainState, mainState.pressedCoords);
                     mainState.pressedCoords = touch;
+                    break;
                 }
             }
         }
@@ -143,14 +144,16 @@ int main(int argc, char **argv)
         // Keyboard inputs
         u32 kDown = hidKeysDown();
 		if (kDown & KEY_START) break; // break in order to return to hbmenu
-        if (kDown & KEY_A) {
+        if (kDown & KEY_A)
+        {
             mainState.scene = 0;
             mainState.backgroundColorBottom = mainState.colors[0];
         }
-        if (kDown & KEY_B) {
-            addDummyEntry(&mainState, testCount++);
-            mainState.message = countBookEntries(&mainState.addressBook);
+        if (kDown & KEY_B)
+        {
+            addDummyEntry(&mainState);
             saveAddressBook(&mainState.addressBook);
+            mainState.message = mainState.addressBook.size;
         }
 
 
@@ -159,8 +162,8 @@ int main(int argc, char **argv)
         C2D_TargetClear(top, mainState.backgroundColorTop);
         C2D_SceneBegin(top);
         char randomData[100];
-        snprintf(randomData, sizeof(randomData), "%s", mainState.addressBook.data[3].name);
-        drawText(6, 6, 1, 1, mainState.colors[3], randomData, C2D_WithColor | C2D_WordWrap, font);
+        snprintf(randomData, sizeof(randomData), "%d\n%d\n%d", mainState.currentAddress, mainState.addressBook.size, mainState.addressBook.size - (mainState.addressBookPage * 2));
+        drawText(0, 0, 1, 1, mainState.colors[3], randomData, C2D_WithColor | C2D_WordWrap, font);
         //for (int i = 0; i < mainState.fileCount; i++) {
         //    drawText(6, (i + 10) * 6, 1, 1, mainState.colors[2], mainState.fileList[i], C2D_WithColor | C2D_WordWrap, font);
         //}
@@ -170,9 +173,43 @@ int main(int argc, char **argv)
         C2D_TargetClear(bottom, mainState.backgroundColorBottom);
         C2D_SceneBegin(bottom);
         for (int i = 0; i < buttonCount; i++) {
-            if(mainState.scene == buttons[i].scene) {
-                drawButton(&buttons[i]);
+            if(mainState.scene == mainState.buttons[i].scene) {
+                drawButton(&mainState.buttons[i]);
             }
+        }
+        if(mainState.scene == BOOK)
+        {
+            char subtitle[135];
+            UIButton* addressButton;
+            if((2 * mainState.addressBookPage) < mainState.addressBook.size) {
+                addressButton = &mainState.buttons[3];
+                addressButton->text = mainState.addressBook.data[(2 * mainState.addressBookPage)].name;
+                snprintf(subtitle, sizeof(subtitle), "%s:%s", mainState.addressBook.data[(2 * mainState.addressBookPage)].address, mainState.addressBook.data[(2 * mainState.addressBookPage)].port);
+                addressButton->subtext = subtitle;
+            }
+            else {
+                addressButton = &mainState.buttons[3];
+                addressButton->text = "New Entry";
+                addressButton->subtext = "Add a new entry.";
+            }
+
+            if((2 * mainState.addressBookPage) + 1 < mainState.addressBook.size) {
+                addressButton = &mainState.buttons[4];
+                addressButton->text = mainState.addressBook.data[(2 * mainState.addressBookPage) + 1].name;
+                snprintf(subtitle, sizeof(subtitle), "%s:%s", mainState.addressBook.data[(2 * mainState.addressBookPage) + 1].address, mainState.addressBook.data[(2 * mainState.addressBookPage) + 1].port);
+                addressButton->subtext = subtitle;
+            }
+            else {
+                addressButton = &mainState.buttons[4];
+                addressButton->text = "New Entry";
+                addressButton->subtext = "Add a new entry.";
+            }
+
+
+            char page[4];
+            volatile int page_size = sizeof(page);
+            snprintf(page, page_size, "%d", mainState.addressBookPage + 1);
+            drawText(155, 206, 1, 1, mainState.colors[3], page, C2D_WithColor | C2D_WordWrap, font);
         }
 
         // Ooh pretty colors

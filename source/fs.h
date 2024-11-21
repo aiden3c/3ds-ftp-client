@@ -1,6 +1,7 @@
 #ifndef FS_H
 #define FS_H
 
+#include <stdlib.h>
 #include <citro2d.h>
 
 typedef struct AddressBookEntry AddressBookEntry;
@@ -21,6 +22,7 @@ struct AddressBookEntry {
 };
 
 struct AddressBook {
+    int size;
     AddressBookEntry data[128]; // arbitrary
 };
 
@@ -31,6 +33,6 @@ char** listSD(char* path, int* length);
 Result createFile(FS_Archive archive, FS_Path path, u64 fileSize);
 Result readAddressBook(AddressBook *book);
 Result saveAddressBook(AddressBook *book);
-size_t countBookEntries(const AddressBook* book);
+int countBookEntries(const AddressBook* book);
 
 #endif // FS_H

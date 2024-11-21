@@ -1,3 +1,5 @@
 --atlas -f rgba8888 -z auto
 buttonMain.png
 buttonEdit.png
+arrowLeft.png
+arrowRight.png

@@ -9,6 +9,8 @@
 typedef struct AppState AppState;
 typedef struct UIButton UIButton;
 
+extern C2D_SpriteSheet spriteSheet;
+
 // Enums
 enum Scene {
     ROOT,
@@ -31,6 +33,9 @@ struct AppState {
     int message;
     char* status;
     AddressBook addressBook;
+    int currentAddress;
+    int addressBookPage;
+    UIButton* buttons;
 };
 
 // UIButton definition
@@ -41,7 +46,9 @@ struct UIButton {
     bool pressed;
     bool disabled;
     bool rainbow;
+    bool hideShadow;
     char* text;
+    char* subtext;
     int textOffsetX;
     int textOffsetY;
     float textScale;
